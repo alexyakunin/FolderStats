@@ -16,7 +16,7 @@ namespace FolderStats
             "json,yaml,yml," +
             "xml," +
             "html,css," +
-            "js,jsx,ts," +
+            "js,jsx,ts,tsx," +
             "cs,cshtml," +
             "py," +
             "sql," +
@@ -26,12 +26,19 @@ namespace FolderStats
 
         /// <summary>Prints directory statistics.</summary>
         /// <param name="text">Comma-separated list of text file extensions (files to count lines for) -- e.g. "js,py,cs".</param>
+        /// <param name="only">Comma-separated list of file extensions to include.</param>
         /// <param name="args">Directories to print statistics for.</param>
-        static async Task Main(InvocationContext ctx, string? text, string[] args)
+        static async Task Main(InvocationContext ctx, string? text, string? only, string[] args)
         {
             var dirs = args ?? new[] { "." };
-            var extensions = (text ?? DefaultExtensions)
+            var includeExtensions = (only ?? "")
                 .Split(",")
+                .Where(e => !string.IsNullOrEmpty(e))
+                .Select(e => "." + e.Trim())
+                .ToArray();
+            var textExtensions = (text ?? DefaultExtensions)
+                .Split(",")
+                .Where(e => !string.IsNullOrEmpty(e))
                 .Select(e => "." + e.Trim())
                 .ToArray();
 
@@ -39,7 +46,7 @@ namespace FolderStats
             Console.CancelKeyPress += (_, eventArgs) => cancelCts.Cancel();
             var cancellationToken = cancelCts.Token;
 
-            var s = new Statistics(extensions);
+            var s = new Statistics(includeExtensions, textExtensions);
             var tasks = dirs.Select(p => Task.Run(
                 () => s.ProcessDir(p, cancellationToken), 
                 cancellationToken));
@@ -48,7 +55,7 @@ namespace FolderStats
             var output = new StackLayoutView() {
                 new StackLayoutView() {
                     new ContentView($"Directories: {string.Join(", ", dirs)}"),
-                    new ContentView($"Extensions:  {string.Join(" ", extensions)}"),
+                    new ContentView($"Extensions:  {string.Join(" ", textExtensions)}"),
                 },
                 new StatisticsView("Statistics by directory:", "Directory", s.ByDirectory),
                 new StatisticsView("Statistics by extension:", "Extension", s.ByExtension),

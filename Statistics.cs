@@ -10,6 +10,7 @@ namespace FolderStats
     {
         public static string DirectoryExtension = "(directory)";
         public HashSet<string> TextExtensions { get; }
+        public HashSet<string> IncludeExtensions { get; }
 
         public Dictionary<string, FileStatistics> ByDirectory { get; } = 
             new Dictionary<string, FileStatistics>();
@@ -17,8 +18,11 @@ namespace FolderStats
             new Dictionary<string, FileStatistics>();
         protected object Lock { get; } = new object();
 
-        public Statistics(IEnumerable<string> textExtensions) 
-            => TextExtensions = textExtensions.ToHashSet();
+        public Statistics(IEnumerable<string> includeExtensions, IEnumerable<string> textExtensions)
+        {
+            IncludeExtensions = includeExtensions.ToHashSet();
+            TextExtensions = textExtensions.ToHashSet();
+        }
 
         public async Task<FileStatistics> ProcessDir(string path, CancellationToken cancellationToken)
         {
@@ -26,7 +30,10 @@ namespace FolderStats
             var info = new DirectoryInfo(path);
             var dirs = info.GetDirectories();
             var files = info.GetFiles();
-
+            if (IncludeExtensions.Count > 0)
+                files = files
+                    .Where(p => IncludeExtensions.Contains(Path.GetExtension(p.Name)))
+                    .ToArray();
 
             var dirTasks = dirs.Select(p => Task.Run(
                 () => ProcessDir(Path.Combine(path, p.Name), cancellationToken), 
@@ -79,11 +86,14 @@ namespace FolderStats
         {
             var extension = isDirectory ? DirectoryExtension : Path.GetExtension(path).ToLowerInvariant();
             lock (Lock) {
-                ByExtension[extension] = statistics.CombineWith(
-                    ByExtension.GetValueOrDefault(extension));
-                if (isDirectory)
-                    ByDirectory[path] = statistics.CombineWith(
-                        ByDirectory.GetValueOrDefault(path));
+                var s = statistics.CombineWith(ByExtension.GetValueOrDefault(extension));
+                if (s.Size > 0)
+                    ByExtension[extension] = s;
+                if (isDirectory) {
+                    s = statistics.CombineWith(ByDirectory.GetValueOrDefault(path));
+                    if (s.Size > 0)
+                        ByDirectory[path] = s;
+                }
             }
         }
     }
