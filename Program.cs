@@ -19,6 +19,7 @@ namespace FolderStats
             "js,jsx,ts," +
             "cs,cshtml," +
             "py," +
+            "sql," +
             "bat,cmd,sh,ps1,psm1," +
             "tf,tfvar," +
             "cfg,config,conf,properties,options,secrets";
